@@ -1,0 +1,784 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ESP32-S3 Pin Picker (Dev Module)</title>
+  <style>
+    :root{
+      --bg:#0b0c10;
+      --panel:#12141b;
+      --panel2:#0f1117;
+      --text:#e7e9ee;
+      --muted:#a7adbb;
+      --border:#2a2f3a;
+      --btn:#1a1f2b;
+      --btnHover:#22293a;
+
+      --green:#1f7a3a;
+      --green2:#2ea44f;
+
+      --amber:#6e5a14;
+      --amber2:#d1a21f;
+
+      --red:#8f1d2c;
+      --red2:#e5534b;
+
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 14px;
+      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family:var(--font);
+      background: radial-gradient(1200px 600px at 20% 0%, #101425 0%, var(--bg) 55%) fixed;
+      color:var(--text);
+    }
+
+    header{
+      padding:18px 18px 0;
+      max-width:1120px;
+      margin:0 auto;
+    }
+    header h1{
+      margin:0 0 6px;
+      font-size:20px;
+      font-weight:750;
+      letter-spacing:.2px;
+    }
+    header p{
+      margin:0 0 14px;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.45;
+    }
+
+    .wrap{
+      max-width:1120px;
+      margin:0 auto;
+      padding:0 18px 24px;
+      display:grid;
+      gap:14px;
+    }
+
+    .card{
+      background: linear-gradient(180deg, var(--panel) 0%, var(--panel2) 100%);
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:14px;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr 260px 1fr;
+      gap:12px;
+      align-items:stretch;
+    }
+
+    .colTitle{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin:0 0 10px;
+      padding:0 2px;
+      color:var(--muted);
+      font-size:12px;
+    }
+
+    .pinCol{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+
+    .pinBtn{
+      width:100%;
+      text-align:left;
+      padding:10px 10px;
+      border-radius:12px;
+      border:1px solid var(--border);
+      background:var(--btn);
+      color:var(--text);
+      cursor:pointer;
+      transition: transform .04s ease, background .15s ease, border-color .15s ease;
+      user-select:none;
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:10px;
+      min-height:52px;
+    }
+    .pinBtn:hover{ background:var(--btnHover); }
+    .pinBtn:active{ transform: translateY(1px); }
+
+    /* USED (green) */
+    .pinBtn.used{
+      background: linear-gradient(180deg, rgba(46,164,79,.25) 0%, rgba(31,122,58,.18) 100%);
+      border-color: rgba(46,164,79,.7);
+    }
+    .pinBtn.used .badgeNum{
+      background: rgba(46,164,79,.18);
+      border-color: rgba(46,164,79,.7);
+      color: #bdf7cc;
+    }
+
+    /* CAUTION (amber) */
+    .pinBtn.caution{
+      background: linear-gradient(180deg, rgba(209,162,31,.18) 0%, rgba(110,90,20,.16) 100%);
+      border-color: rgba(209,162,31,.75);
+    }
+    .pinBtn.caution .badgeNum{
+      background: rgba(209,162,31,.14);
+      border-color: rgba(209,162,31,.75);
+      color: #ffe8a8;
+    }
+
+    /* RESERVED (red) */
+    .pinBtn.reserved{
+      background: linear-gradient(180deg, rgba(229,83,75,.22) 0%, rgba(143,29,44,.18) 100%);
+      border-color: rgba(229,83,75,.75);
+    }
+    .pinBtn.reserved .badgeNum{
+      background: rgba(229,83,75,.16);
+      border-color: rgba(229,83,75,.75);
+      color: #ffd1cf;
+    }
+
+    .label{
+      display:flex;
+      flex-direction:column;
+      line-height:1.1;
+      gap:6px;
+      min-width:0;
+    }
+
+    /* Top row: name + tags on same line */
+    .topRow{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+      /*min-height: 1.25em; /* keeps consistent height even with no tags */
+      min-height: 22px;
+    }
+
+    .main{
+      font-weight:680;
+      font-size:13px;
+      letter-spacing:.15px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width:100%;
+    }
+
+    .sub{
+      font-size:11px;
+      color:var(--muted);
+      min-height: 1.1em;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width:100%;
+    }
+
+    /* Tag row now sits inline in topRow */
+    .tagRow{
+      display:flex;
+      gap:6px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+    .tagRow.empty::before{
+      content:"—";
+      font-size:10px;
+      color:var(--muted);
+    }
+
+    .tag{
+      font-size:10px;
+      padding:3px 7px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.04);
+      color:var(--muted);
+      line-height:1.3;
+      white-space:nowrap;
+    }
+    .tag.strap,
+    .tag.usb,
+    .tag.jtag,
+    .tag.led{
+      border-color: rgba(209,162,31,.55);
+      color:#ffe8a8;
+      background: rgba(209,162,31,.08);
+    }
+    .tag.pwr{ border-color: rgba(255,255,255,.12); }
+
+    .rightSide{
+      display:flex;
+      flex-direction:column;
+      align-items:flex-end;
+      gap:8px;
+      flex-shrink:0;
+    }
+
+    .badgeNum{
+      font-size:11px;
+      padding:6px 8px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.04);
+      color:var(--muted);
+      white-space:nowrap;
+    }
+
+    .boardRect{
+      border-radius:18px;
+      border:1px dashed rgba(231,233,238,.25);
+      background: rgba(255,255,255,.03);
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      align-items:center;
+      text-align:center;
+      padding:12px;
+      min-height: 100%;
+      gap:10px;
+    }
+    .boardRect .chip{
+      font-weight:850;
+      font-size:14px;
+      letter-spacing:.4px;
+    }
+    .boardRect .hint{
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.35;
+    }
+
+    .legend{
+      display:flex;
+      flex-wrap:wrap;
+      justify-content:center;
+      gap:8px;
+      margin-top:4px;
+    }
+    .legendItem{
+      font-size:11px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      padding:6px 10px;
+      border-radius:999px;
+      color:var(--muted);
+      display:flex;
+      align-items:center;
+      gap:8px;
+      white-space:nowrap;
+    }
+    .dot{
+      width:10px; height:10px; border-radius:50%;
+      border:1px solid rgba(255,255,255,.2);
+      background: rgba(255,255,255,.08);
+      display:inline-block;
+    }
+    .dot.green{ background: rgba(46,164,79,.7); border-color: rgba(46,164,79,.9); }
+    .dot.amber{ background: rgba(209,162,31,.75); border-color: rgba(209,162,31,.95); }
+    .dot.red{ background: rgba(229,83,75,.75); border-color: rgba(229,83,75,.95); }
+
+    .controls{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      justify-content:center;
+    }
+    .smallBtn{
+      padding:9px 10px;
+      border-radius:12px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.04);
+      color:var(--text);
+      cursor:pointer;
+      transition: background .15s ease;
+      font-size:12px;
+    }
+    .smallBtn:hover{ background: rgba(255,255,255,.07); }
+
+    .lists{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:12px;
+      margin-top:12px;
+    }
+    .listBox{
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      background: rgba(255,255,255,.03);
+      padding:12px;
+      min-height:120px;
+    }
+    .listBox h2{
+      margin:0 0 8px;
+      font-size:13px;
+      color:var(--muted);
+      font-weight:750;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+    }
+    .badgeCount{
+      font-size:11px;
+      padding:6px 8px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.04);
+      color:var(--muted);
+      white-space:nowrap;
+    }
+    .mono{
+      font-family: var(--mono);
+      font-size:12px;
+      line-height:1.5;
+      white-space:pre-wrap;
+      word-break:break-word;
+      color:#dfe3ee;
+    }
+
+    .footerNote{
+      margin-top:10px;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.45;
+    }
+
+    @media (max-width: 980px){
+      .grid{ grid-template-columns: 1fr; }
+      .boardRect{ min-height:160px; }
+      .lists{ grid-template-columns: 1fr; }
+      .pinBtn{ align-items:flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ESP32-S3 Pin Picker (Dev Module)</h1>
+    <p>
+      Left click = <b>Used</b> (green). Shift+click = <b>Caution</b> (amber). Right click = <b>Reserved</b> (red).
+      Hover a pin to see tags/warnings.
+    </p>
+  </header>
+
+  <div class="wrap">
+    <div class="card">
+      <div class="grid">
+        <div>
+          <div class="colTitle">
+            <span>Left header</span>
+            <span id="leftCount">0</span>
+          </div>
+          <div class="pinCol" id="leftPins"></div>
+        </div>
+
+        <div class="boardRect">
+          <div class="chip">ESP32-S3 Dev Module</div>
+          <div class="hint">
+            Name + tags are inline for compact scanning.<br/>
+            Next: load pins + rules from JSON.
+          </div>
+
+          <div class="legend">
+            <div class="legendItem"><span class="dot green"></span>Used</div>
+            <div class="legendItem"><span class="dot amber"></span>Caution</div>
+            <div class="legendItem"><span class="dot red"></span>Reserved</div>
+          </div>
+
+          <div class="controls">
+            <button class="smallBtn" id="clearAllBtn">Clear all</button>
+            <button class="smallBtn" id="restoreDefaultsBtn">Restore defaults</button>
+            <button class="smallBtn" id="copyUsedBtn">Copy used</button>
+            <button class="smallBtn" id="copyUnusedBtn">Copy unused</button>
+            <button class="smallBtn" id="copyCautionBtn">Copy caution</button>
+            <button class="smallBtn" id="copyReservedBtn">Copy reserved</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="colTitle">
+            <span>Right header</span>
+            <span id="rightCount">0</span>
+          </div>
+          <div class="pinCol" id="rightPins"></div>
+        </div>
+      </div>
+
+      <div class="lists">
+        <div class="listBox">
+          <h2><span>Used pins</span><span class="badgeCount" id="usedBadge">0</span></h2>
+          <div class="mono" id="usedList"></div>
+        </div>
+
+        <div class="listBox">
+          <h2><span>Unused pins</span><span class="badgeCount" id="unusedBadge">0</span></h2>
+          <div class="mono" id="unusedList"></div>
+        </div>
+
+        <div class="listBox">
+          <h2><span>Caution pins</span><span class="badgeCount" id="cautionBadge">0</span></h2>
+          <div class="mono" id="cautionList"></div>
+        </div>
+
+        <div class="listBox">
+          <h2><span>Reserved pins</span><span class="badgeCount" id="reservedBadge">0</span></h2>
+          <div class="mono" id="reservedList"></div>
+        </div>
+      </div>
+
+      <div class="footerNote">
+        Notes: “Caution” = usable, but has gotchas (boot straps, USB, JTAG, onboard LED, etc).
+        “Reserved” = your personal hard-no list.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // 1) BOARD LAYOUT (labels only)
+    // Edit these arrays to match your physical header order.
+    // =========================================================================
+    const LEFT_PINS = [
+      { name: "3V3", gpio: null, note: "3.3V" },
+      { name: "3V3", gpio: null, note: "3.3V" },
+      { name: "RST", gpio: null, note: "EN" },
+      { name: "GPIO4",  gpio: 4,  note: "" },
+      { name: "GPIO5",  gpio: 5,  note: "" },
+      { name: "GPIO6",  gpio: 6,  note: "" },
+      { name: "GPIO7",  gpio: 7,  note: "" },
+      { name: "GPIO15", gpio: 15, note: "" },
+      { name: "GPIO16", gpio: 16, note: "" },
+      { name: "GPIO17", gpio: 17, note: "" },
+      { name: "GPIO18", gpio: 18, note: "" },
+      { name: "GPIO8",  gpio: 8,  note: "" },
+      { name: "GPIO3",  gpio: 3,  note: "" },
+      { name: "GPIO46", gpio: 46, note: "" },
+      { name: "GPIO9",  gpio: 9,  note: "" },
+      { name: "GPIO10", gpio: 10, note: "" },
+      { name: "GPIO11", gpio: 11, note: "" },
+      { name: "GPIO12", gpio: 12, note: "" },
+      { name: "GPIO13", gpio: 13, note: "" },
+      { name: "GPIO14", gpio: 14, note: "" },
+      { name: "5V",     gpio: null, note: "5V" },
+      { name: "GND",    gpio: null, note: "G" }
+    ];
+
+    const RIGHT_PINS = [
+      { name: "GND",    gpio: null, note: "G" },
+      { name: "TX (GPIO43)", gpio: 43, note: "UART0 TX (often)" },
+      { name: "RX (GPIO44)", gpio: 44, note: "UART0 RX (often)" },
+      { name: "GPIO1",  gpio: 1,  note: "" },
+      { name: "GPIO2",  gpio: 2,  note: "" },
+      { name: "GPIO42", gpio: 42, note: "" },
+      { name: "GPIO41", gpio: 41, note: "" },
+      { name: "GPIO40", gpio: 40, note: "" },
+      { name: "GPIO39", gpio: 39, note: "" },
+      { name: "GPIO38", gpio: 38, note: "" },
+      { name: "GPIO37", gpio: 37, note: "" },
+      { name: "GPIO36", gpio: 36, note: "" },
+      { name: "GPIO35", gpio: 35, note: "" },
+      { name: "GPIO0",  gpio: 0,  note: "BOOT" },
+      { name: "GPIO45", gpio: 45, note: "" },
+      { name: "GPIO48", gpio: 48, note: "" },
+      { name: "GPIO47", gpio: 47, note: "" },
+      { name: "GPIO21", gpio: 21, note: "" },
+      { name: "GPIO20", gpio: 20, note: "" },
+      { name: "GPIO19", gpio: 19, note: "" },
+      { name: "GND",    gpio: null, note: "G" },
+      { name: "GND",    gpio: null, note: "G" }
+    ];
+
+    // =========================================================================
+    // 2) PIN TAGS + WARNINGS (chip/board rules)
+    // =========================================================================
+    const TAG_LABELS = {
+      strap: "strap",
+      usb: "usb",
+      jtag: "jtag",
+      led: "led",
+      uart0: "uart0",
+      pwr: "pwr"
+    };
+
+    const GPIO_META = {
+      0:  { tags:["strap"], warn:"Boot strap / download mode. External pulls can break boot/flash." },
+      3:  { tags:["strap"], warn:"Strapping pin. Keep external circuitry from forcing level at reset." },
+      45: { tags:["strap"], warn:"Strapping pin. Avoid if external pulls/noisy inputs." },
+      46: { tags:["strap"], warn:"Strapping pin. Often flagged as special; avoid for noisy signals." },
+
+      19: { tags:["usb"], warn:"Often USB D- (native USB). Using can break flashing/USB features." },
+      20: { tags:["usb"], warn:"Often USB D+ (native USB). Using can break flashing/USB features." },
+
+      39: { tags:["jtag"], warn:"JTAG group (MTCK). Fine if not debugging; caution for later." },
+      40: { tags:["jtag"], warn:"JTAG group (MTDO). Fine if not debugging; caution for later." },
+      41: { tags:["jtag"], warn:"JTAG group (MTDI). Fine if not debugging; caution for later." },
+      42: { tags:["jtag"], warn:"JTAG group (MTMS). Fine if not debugging; caution for later." },
+
+      38: { tags:["led"], warn:"On some dev boards used by onboard RGB LED / peripherals. Check your board." },
+      48: { tags:["led"], warn:"On some dev boards used by onboard RGB LED / peripherals. Check your board." },
+
+      43: { tags:["uart0"], warn:"Often UART0 TX on dev boards (logs/flashing). Not always, but be aware." },
+      44: { tags:["uart0"], warn:"Often UART0 RX on dev boards (logs/flashing). Not always, but be aware." }
+    };
+
+    // =========================================================================
+    // 3) DEFAULT STATES
+    // =========================================================================
+    const DEFAULT_CAUTION_GPIOS = [0,3,45,46,19,20,39,40,41,42,38,48];
+    const DEFAULT_RESERVED_GPIOS = [];
+
+    // =========================================================================
+    // 4) APP STATE
+    // =========================================================================
+    const used = new Set();
+    const caution = new Set();
+    const reserved = new Set();
+
+    const leftPinsEl = document.getElementById("leftPins");
+    const rightPinsEl = document.getElementById("rightPins");
+
+    const usedListEl = document.getElementById("usedList");
+    const unusedListEl = document.getElementById("unusedList");
+    const cautionListEl = document.getElementById("cautionList");
+    const reservedListEl = document.getElementById("reservedList");
+
+    const usedBadgeEl = document.getElementById("usedBadge");
+    const unusedBadgeEl = document.getElementById("unusedBadge");
+    const cautionBadgeEl = document.getElementById("cautionBadge");
+    const reservedBadgeEl = document.getElementById("reservedBadge");
+
+    const leftCountEl = document.getElementById("leftCount");
+    const rightCountEl = document.getElementById("rightCount");
+
+    function pinText(pin){
+      if (pin.gpio === null || pin.gpio === undefined) return pin.name;
+      if (/GPIO\d+/.test(pin.name)) return pin.name;
+      return `GPIO${pin.gpio}`;
+    }
+
+    function getMetaFor(pin){
+      if (pin.gpio === null || pin.gpio === undefined) return { tags:["pwr"], warn:"" };
+      return GPIO_META[pin.gpio] || { tags:[], warn:"" };
+    }
+
+    function titleFor(pin){
+      const meta = getMetaFor(pin);
+      const tagStr = meta.tags.length ? `Tags: ${meta.tags.map(t=>TAG_LABELS[t]||t).join(", ")}` : "Tags: (none)";
+      const warnStr = meta.warn ? `\n\nWarning: ${meta.warn}` : "";
+      return `${pin.name}${pin.gpio !== null && pin.gpio !== undefined ? ` (GPIO${pin.gpio})` : ""}\n${tagStr}${warnStr}`;
+    }
+
+    function renderColumn(container, pins, sideLetter){
+      container.innerHTML = "";
+      pins.forEach((pin, idx) => {
+        const id = `${sideLetter}-${idx}`;
+        const meta = getMetaFor(pin);
+
+        const btn = document.createElement("button");
+        btn.className = "pinBtn";
+        btn.dataset.id = id;
+        btn.dataset.gpio = (pin.gpio === null || pin.gpio === undefined) ? "" : String(pin.gpio);
+        btn.title = titleFor(pin);
+
+        const label = document.createElement("div");
+        label.className = "label";
+
+        // Top row (name + tags inline)
+        const topRow = document.createElement("div");
+        topRow.className = "topRow";
+
+        const main = document.createElement("div");
+        main.className = "main";
+        main.textContent = pin.name;
+
+        const tagRow = document.createElement("div");
+        tagRow.className = "tagRow";
+
+        if (meta.tags.length) {
+          meta.tags.forEach(t => {
+            const tag = document.createElement("span");
+            tag.className = `tag ${t}`;
+            tag.textContent = TAG_LABELS[t] || t;
+            tagRow.appendChild(tag);
+          });
+        } else {
+          tagRow.classList.add("empty"); // shows placeholder dash
+        }
+
+        topRow.appendChild(main);
+        topRow.appendChild(tagRow);
+
+        const sub = document.createElement("div");
+        sub.className = "sub";
+        sub.textContent = (pin.note && pin.note.trim().length) ? pin.note : "—";
+
+        label.appendChild(topRow);
+        label.appendChild(sub);
+
+        const right = document.createElement("div");
+        right.className = "rightSide";
+
+        const badge = document.createElement("div");
+        badge.className = "badgeNum";
+        badge.textContent = (pin.gpio === null || pin.gpio === undefined) ? "PWR" : `#${pin.gpio}`;
+
+        right.appendChild(badge);
+
+        btn.appendChild(label);
+        btn.appendChild(right);
+
+        // Left click: Used. Shift+click: Caution. Right click: Reserved.
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+
+          if (e.shiftKey) {
+            if (caution.has(id)) caution.delete(id);
+            else {
+              caution.add(id);
+              used.delete(id);
+              reserved.delete(id);
+            }
+            syncUI();
+            return;
+          }
+
+          if (reserved.has(id)) return;
+
+          if (used.has(id)) used.delete(id);
+          else {
+            used.add(id);
+            caution.delete(id);
+          }
+          syncUI();
+        });
+
+        btn.addEventListener("contextmenu", (e) => {
+          e.preventDefault();
+          if (reserved.has(id)) reserved.delete(id);
+          else {
+            reserved.add(id);
+            used.delete(id);
+            caution.delete(id);
+          }
+          syncUI();
+        });
+
+        container.appendChild(btn);
+      });
+    }
+
+    function allPinsFlat(){
+      const all = [];
+      LEFT_PINS.forEach((p,i)=>all.push({ side:"Left", id:`L-${i}`, ...p }));
+      RIGHT_PINS.forEach((p,i)=>all.push({ side:"Right", id:`R-${i}`, ...p }));
+      return all;
+    }
+
+    function formatBySide(list){
+      const left = list.filter(p=>p.side==="Left").map(p=>pinText(p));
+      const right = list.filter(p=>p.side==="Right").map(p=>pinText(p));
+      return [
+        `Left:  ${left.length ? left.join(", ") : "—"}`,
+        `Right: ${right.length ? right.join(", ") : "—"}`
+      ].join("\n");
+    }
+
+    function syncUI(){
+      document.querySelectorAll(".pinBtn").forEach(btn => {
+        const id = btn.dataset.id;
+        btn.classList.toggle("used", used.has(id));
+        btn.classList.toggle("caution", caution.has(id));
+        btn.classList.toggle("reserved", reserved.has(id));
+      });
+
+      const all = allPinsFlat();
+      const usedPins = all.filter(p => used.has(p.id));
+      const cautionPins = all.filter(p => caution.has(p.id));
+      const reservedPins = all.filter(p => reserved.has(p.id));
+      const unusedPins = all.filter(p => !used.has(p.id) && !caution.has(p.id) && !reserved.has(p.id));
+
+      usedListEl.textContent = formatBySide(usedPins);
+      cautionListEl.textContent = formatBySide(cautionPins);
+      reservedListEl.textContent = formatBySide(reservedPins);
+      unusedListEl.textContent = formatBySide(unusedPins);
+
+      usedBadgeEl.textContent = usedPins.length;
+      cautionBadgeEl.textContent = cautionPins.length;
+      reservedBadgeEl.textContent = reservedPins.length;
+      unusedBadgeEl.textContent = unusedPins.length;
+
+      leftCountEl.textContent = `${usedPins.filter(p=>p.side==="Left").length} used`;
+      rightCountEl.textContent = `${usedPins.filter(p=>p.side==="Right").length} used`;
+    }
+
+    async function copyText(text){
+      try{
+        await navigator.clipboard.writeText(text);
+      }catch(e){
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+    }
+
+    function applyDefaults(){
+      used.clear(); caution.clear(); reserved.clear();
+
+      const allButtons = Array.from(document.querySelectorAll(".pinBtn"));
+      for (const btn of allButtons){
+        const id = btn.dataset.id;
+        const gpioStr = btn.dataset.gpio;
+        if (!gpioStr) continue;
+        const gpio = Number(gpioStr);
+
+        if (DEFAULT_RESERVED_GPIOS.includes(gpio)) reserved.add(id);
+        else if (DEFAULT_CAUTION_GPIOS.includes(gpio)) caution.add(id);
+      }
+    }
+
+    document.getElementById("clearAllBtn").addEventListener("click", () => {
+      used.clear(); caution.clear(); reserved.clear();
+      syncUI();
+    });
+
+    document.getElementById("restoreDefaultsBtn").addEventListener("click", () => {
+      applyDefaults();
+      syncUI();
+    });
+
+    document.getElementById("copyUsedBtn").addEventListener("click", async () => {
+      await copyText(usedListEl.textContent);
+    });
+    document.getElementById("copyUnusedBtn").addEventListener("click", async () => {
+      await copyText(unusedListEl.textContent);
+    });
+    document.getElementById("copyCautionBtn").addEventListener("click", async () => {
+      await copyText(cautionListEl.textContent);
+    });
+    document.getElementById("copyReservedBtn").addEventListener("click", async () => {
+      await copyText(reservedListEl.textContent);
+    });
+
+    // init
+    renderColumn(leftPinsEl, LEFT_PINS, "L");
+    renderColumn(rightPinsEl, RIGHT_PINS, "R");
+    applyDefaults();
+    syncUI();
+  </script>
+</body>
+</html>
