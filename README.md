@@ -10,8 +10,6 @@ Designed originally to help allocate pins for embedded projects (CNC controllers
 
 👉 https://festivejelly.github.io/ESP32PinPlanner/
 
-(Will become active once GitHub Pages is enabled)
-
 ---
 
 ## ✨ Features
